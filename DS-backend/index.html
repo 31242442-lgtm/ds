@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>DS 😘</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+<style>
+body{font-family:Arial;background:#0e1117;color:#fff;margin:0}
+.container{max-width:1100px;margin:auto;padding:20px}
+.card{background:#1c2436;padding:20px;border-radius:12px;margin-bottom:20px}
+button{padding:10px 15px;border:none;border-radius:6px;background:#f0c040;cursor:pointer;margin:5px}
+input,select{padding:8px;border-radius:6px;border:none;width:100%;margin-bottom:10px}
+.status{font-size:12px;margin-top:8px}
+.chat-msg{margin:6px 0}
+.user{color:#f0c040}
+.ai{color:#4caf50}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>DS 😘</h1>
+
+<div class="card">
+<h3>🎯 AI Quiz (Past CET Questions)</h3>
+<select id="quizSubject">
+<option>Legal</option>
+<option>GK</option>
+<option>Reasoning</option>
+<option>English</option>
+<option>Math</option>
+</select>
+<select id="quizYear">
+<option value="">Any Year</option>
+<option>2023</option>
+<option>2022</option>
+<option>2021</option>
+</select>
+<div id="quiz">Start quiz</div>
+<div id="options"></div>
+<div id="score">Score: 0</div>
+<div id="status" class="status">Checking backend...</div>
+<button onclick="generateQuiz()">Next</button>
+</div>
+
+<div class="card">
+<h3>🤖 AI Tutor Chat</h3>
+<input id="chatInput" placeholder="Ask CET doubts..." />
+<button onclick="chatAI()">Send</button>
+<div id="chatBox"></div>
+</div>
+
+</div>
+
+<script>
+let score=0;
+let difficulty='easy';
+const BACKEND_URL="http://localhost:5000";
+
+function getEl(id){return document.getElementById(id);} 
+
+async function checkBackend(){
+ const el=getEl('status');
+ if(!el) return;
+ try{
+  const res=await fetch(BACKEND_URL);
+  if(res.ok){
+    el.textContent="✅ Backend Connected";
+  }else{
+    el.textContent="⚠️ Backend Error";
+  }
+ }catch(e){
+  el.textContent="❌ Backend not running (using fallback mode)";
+ }
+}
+
+async function generateQuiz(){
+ const q=getEl('quiz');
+ const opt=getEl('options');
+ const subject=getEl('quizSubject').value;
+ const year=getEl('quizYear').value;
+
+ if(!q||!opt) return;
+ opt.innerHTML="";
+
+ try{
+  const res=await fetch(BACKEND_URL+'/quiz',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      type: "past_cet",
+      subject,
+      year,
+      difficulty
+    })
+  });
+
+  if(!res.ok) throw "Backend error";
+
+  const data=await res.json();
+
+  if(!data.question) throw "No question";
+
+  showQuestion(data.question,data.options,data.answer);
+
+ }catch(e){
+  const fallbackQuestions=[
+    {q:"2+2=?",o:['3','4','5'],a:'4'},
+    {q:"Capital of India?",o:['Mumbai','Delhi','Pune'],a:'Delhi'},
+    {q:"Synonym of Happy?",o:['Sad','Joyful','Angry'],a:'Joyful'}
+  ];
+  const random=fallbackQuestions[Math.floor(Math.random()*fallbackQuestions.length)];
+  showQuestion(random.q,random.o,random.a);
+ }
+}
+
+function showQuestion(question,options,answer){
+ const q=getEl('quiz');
+ const opt=getEl('options');
+ if(!q||!opt) return;
+ q.innerText=question;
+ options.forEach(o=>{
+  const b=document.createElement('button');
+  b.innerText=o;
+  b.onclick=()=>checkAnswer(o,answer);
+  opt.appendChild(b);
+ });
+}
+
+function checkAnswer(sel,ans){
+ if(sel===ans){ score++; difficulty='hard'; }
+ else{ difficulty='easy'; }
+ const scoreEl=getEl('score');
+ if(scoreEl) scoreEl.innerText="Score: "+score;
+}
+
+async function chatAI(){
+ const input=getEl('chatInput');
+ const box=getEl('chatBox');
+ if(!input||!box) return;
+ const msg=input.value;
+ if(!msg) return;
+
+ box.innerHTML+=`<p class='user'><b>You:</b> ${msg}</p>`;
+
+ try{
+  const res=await fetch(BACKEND_URL+'/chat',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({message:msg})
+  });
+
+  if(!res.ok) throw "Backend error";
+
+  const data=await res.json();
+  box.innerHTML+=`<p class='ai'><b>AI:</b> ${data.reply}</p>`;
+ }catch(e){
+  box.innerHTML+=`<p class='ai'><b>AI:</b> (Offline Mode) Try again later</p>`;
+ }
+
+ input.value="";
+}
+
+window.onload=function(){
+ checkBackend();
+};
+</script>
+</body>
+</html>
